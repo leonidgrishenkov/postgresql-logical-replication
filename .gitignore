@@ -1,2 +1,10 @@
 .env
+env.sh
 certs/*
+
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
