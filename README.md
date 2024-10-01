@@ -1,47 +1,3 @@
-# Create hosts in Yandex Cloud
-
-Source file with all required environment variables including values for terraform variables (which are start with `TF_VAR_*`):
-
-```sh
-source env.sh
-```
-
-```sh
-cd ./terraform
-```
-
-Initialize terraform:
-
-```sh
-terraform init
-```
-
-Optionally validate configurations:
-
-```sh
-terraform validate
-```
-
-Create resources:
-
-```sh
-terraform apply
-```
-
-Show terraform outputs:
-
-```sh
-terraform output
-```
-
-Set those output values as env variables:
-
-```sh
-export VM_SOURCE_EXT_IP=$(terraform output -json | jq -r '.["vm-source-external-ip"].value') \
-    && export VM_TARGET_EXT_IP=$(terraform output -json | jq -r '.["vm-target-external-ip"].value')
-```
-
-
 # Generate SSL Certificates
 
 Using OpenSSL.
@@ -113,7 +69,7 @@ Again make sure you fill the `Common Name (CN)` section.
 # Build image
 
 ```sh
-export IMAGE=cr.yandex/$YC_REGISTRY_ID/postgres-ssl:16.4-bullseye-1.6
+source env.sh
 ```
 
 I will build multi-platform image to be able to run it on Linux machine.
@@ -139,15 +95,62 @@ echo $YC_IAM_TOKEN | docker login --username iam --password-stdin cr.yandex
 Build and push an image to the registry:
 
 ```sh
-docker build -t $IMAGE \
+docker build -t $POSTGRES_IMAGE \
 	--load \
 	--platform linux/amd64,linux/arm64 \
 	-f ./Dockerfile .
 ```
 
 ```sh
-docker push $IMAGE
+docker push $POSTGRES_IMAGE
 ```
 
 
-#
+# Create hosts in Yandex Cloud
+
+Source file with all required environment variables including values for terraform variables (which are start with `TF_VAR_*`):
+
+```sh
+source env.sh
+```
+
+```sh
+cd ./deploy
+```
+
+Initialize terraform:
+
+```sh
+terraform init
+```
+
+Optionally validate configurations:
+
+```sh
+terraform validate
+```
+
+Create resources:
+
+```sh
+terraform apply
+```
+
+Show terraform outputs:
+
+```sh
+terraform output
+```
+
+Set those output values as env variables:
+
+```sh
+export VM_SOURCE_EXT_IP=$(terraform output -json | jq -r '.["vm-source-external-ip"].value') \
+    && export VM_TARGET_EXT_IP=$(terraform output -json | jq -r '.["vm-target-external-ip"].value')
+```
+
+Get serial port output of deployed virtual machines to make sure that everything is correct:
+
+```sh
+yc compute instance get-serial-port-output --name postgresql-source
+```

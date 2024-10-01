@@ -1,0 +1,36 @@
+#cloud-config
+users:
+    - name: ${username}
+      groups: sudo
+      sudo: ALL=(ALL) NOPASSWD:ALL
+      shell: /bin/bash
+      ssh-authorized-keys:
+          - ${ssh_key_path}
+
+runcmd:
+    - sudo apt-get update > /dev/null 2>&1
+    - sudo apt-get -y install ca-certificates curl > /dev/null 2>&1
+    - sudo install -m 0755 -d /etc/apt/keyrings
+    - sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    - sudo chmod a+r /etc/apt/keyrings/docker.asc
+    - |
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+          $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+          sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    - sudo apt-get update > /dev/null 2>&1
+    - sudo apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1
+    - sudo usermod -aG docker ${username}
+    - echo ${iam_token} | sudo docker login --username iam --password-stdin cr.yandex
+    - |
+        sudo docker run --detach --quiet \
+          --name postgres \
+          --publish 15432:5432 \
+          --env POSTGRES_DB=db \
+          --env POSTGRES_USER=${postgres_user} \
+          --env POSTGRES_PASSWORD=${postgres_password} \
+          ${postgres_image} \
+          -c ssl=on \
+          -c ssl_cert_file=/var/lib/postgresql/certs/server.crt \
+          -c ssl_key_file=/var/lib/postgresql/certs/server.key \
+          -c ssl_ca_file=/var/lib/postgresql/certs/ca.crt

@@ -23,7 +23,7 @@ variable "image_id" {
   description = "Image ID"
 }
 
-# Variables for PostgreSQL database.
+# Variables for PostgreSQL databases.
 variable "postgres_user" {
   type        = string
   description = "PostgreSQL database root user"
