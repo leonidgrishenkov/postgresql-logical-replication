@@ -105,7 +105,6 @@ docker build -t $POSTGRES_IMAGE \
 docker push $POSTGRES_IMAGE
 ```
 
-
 # Create hosts in Yandex Cloud
 
 Source file with all required environment variables including values for terraform variables (which are start with `TF_VAR_*`):
@@ -154,3 +153,104 @@ Get serial port output of deployed virtual machines to make sure that everything
 ```sh
 yc compute instance get-serial-port-output --name postgresql-source
 ```
+
+# Set logical replication on the source database
+
+Login on the host:
+
+```sh
+ssh -i ~/.ssh/dev-hosts yc-user@$VM_SOURCE_EXT_IP
+```
+
+Attach to the container:
+
+```sh
+docker exec -it postgres /bin/bash
+```
+
+## Authentication
+
+In the `/var/lib/postgresql/data/pg_hba.conf` file, enter the hosts to which replication will be performed. In this example, we will use one host that is on the same cloud network.
+
+Open file:
+
+```sh
+vim /var/lib/postgresql/data/pg_hba.conf
+```
+
+Add the followings configurations:
+
+```sh
+hostssl all all target-host-internal-ip/32 md5
+hostssl all replication target-host-internal-ip/32 md5
+```
+
+You can get internal ip of target host from `terraform output` command.
+
+## WAL log level
+
+Change the logging level for the WAL.
+
+In the `/var/lib/postgresql/data/postgresql.conf` file, find the line with the `wal_level` setting, uncomment it if necessary and set it to `logical`:
+
+```sh
+vim /var/lib/postgresql/data/postgresql.conf
+```
+
+```sh
+wal_level = logical
+```
+
+## Apply changes
+
+Restart docker container:
+
+```sh
+docker restart postgres
+```
+
+Check the container logs:
+
+```sh
+docker logs --tail 20 postgres
+```
+
+# Add data to the source database
+
+Export repositoty to the host:
+
+```sh
+task sync-source
+```
+
+Login to the host:
+
+```sh
+ssh -i ~/.ssh/dev-hosts yc-user@$VM_SOURCE_EXT_IP
+```
+
+Copy sql files into the container:
+
+```sh
+docker cp ~/code/postgresql-logical-replication/data/ postgres:/tmp/
+```
+
+Start psql session in the container:
+
+```sh
+docker exec -it postgres psql "dbname=db user=postgres"
+```
+
+Execute DDL query to create schema:
+
+```sh
+\i /tmp/data/ddl/users.sql
+```
+
+And insert data:
+
+```sh
+\i /tmp/data/insert/users.sql
+```
+
+
