@@ -24,6 +24,11 @@ variable "image_id" {
 }
 
 # Variables for PostgreSQL databases.
+variable "postgres_image" {
+  type        = string
+  description = "PostgreSQL database Docker image and tag that will be pulled from the registry"
+}
+
 variable "postgres_user" {
   type        = string
   description = "PostgreSQL database root user"
@@ -34,9 +39,12 @@ variable "postgres_password" {
   description = "PostgreSQL database root user password"
 }
 
-variable "postgres_image" {
+variable "postgres_port" {
   type        = string
-  description = "PostgreSQL database Docker image and tag that will be pulled from the registry"
+  description = "PostgreSQL database exposed port"
 }
 
-
+variable "postgres_db" {
+  type        = string
+  description = "PostgreSQL database name"
+}
