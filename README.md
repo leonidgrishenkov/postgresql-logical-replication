@@ -253,4 +253,24 @@ And insert data:
 \i /tmp/data/insert/users.sql
 ```
 
+# Generate data
 
+```sh
+poetry install
+```
+
+```sh
+export POSTGRES_HOST=$VM_SOURCE_EXT_IP
+```
+
+Execute table DDL:
+
+```sh
+python src/execute_ddl.py
+```
+
+Generate and insert generated data into source database:
+
+```sh
+python src/generate_users_data.py --tasks=2 --amount=10000
+```

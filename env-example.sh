@@ -9,6 +9,8 @@ export YC_REGISTRY_ID=
 export POSTGRES_IMAGE=cr.yandex/$YC_REGISTRY_ID/postgres-ssl:16.4-bullseye-1.6
 export POSTGRES_USER=
 export POSTGRES_PASSWORD=
+export POSTGRES_PORT=
+export POSTGRES_DB=
 
 # Set values of env variables as Terraform variables.
 export TF_VAR_cloud_id=$YC_CLOUD_ID
@@ -19,3 +21,5 @@ export TF_VAR_zone=
 export TF_VAR_postgres_image=$POSTGRES_IMAGE
 export TF_VAR_postgres_user=$POSTGRES_USER
 export TF_VAR_postgres_password=$POSTGRES_PASSWORD
+export TF_VAR_postgres_port=$POSTGRES_PORT
+export TF_VAR_postgres_db=$POSTGRES_DB

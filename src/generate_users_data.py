@@ -1,21 +1,14 @@
-import logging
-import os
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from faker import Faker
+from fire import Fire
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine.base import Connection
 
-logging.basicConfig(
-    level=logging.INFO,
-    format=r"[%(asctime)s] {%(module)s.%(funcName)s:%(lineno)d} %(levelname)s: %(message)s",
-    datefmt=r"%Y-%m-%d %H:%M:%S",
-    stream=sys.stdout,
-)
-log = logging.getLogger()
+from utils import DB_URL, logger
 
 
 @dataclass
@@ -50,17 +43,10 @@ def generate_users_data(
     fake: Faker,
     query: str,
 ) -> ...:
-    log.info(f"Generating {n} number of users")
-
-    user = os.getenv("POSTGRES_USER")
-    password = os.getenv("POSTGRES_PASSWORD")
-    host = os.getenv("VM_SOURCE_EXT_IP")
-    # TODO: Set these into env.sh and add to terraform.
-    port = os.getenv("POSTGRES_PORT")
-    db = os.getenv("POSTGRES_DB")
+    logger.info(f"Generating {n} number of users")
 
     engine = create_engine(
-        url=f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}",
+        url=DB_URL,
         connect_args={
             "sslmode": "require",
             "sslrootcert": Path(__file__).parents[1] / "certs/ca.crt",
@@ -76,23 +62,24 @@ def generate_users_data(
         conn.commit()
 
     conn.close()
-    log.info(f"Successfully inserted {n} usert into database table")
+    logger.info(f"Successfully inserted {n} usert into database table")
 
 
-def main() -> ...:
+def main(tasks: int, amount: int) -> ...:
     fake = Faker(locale="en_US")
 
+    logger.info(f"Will generate {amount} of users")
+
     sqlfile: Path = Path(__file__).parents[0] / "sql/insert/users.sql"
+    logger.info(f"Reading sql file: {sqlfile}")
     query: str = sqlfile.read_text()
 
-    tasks: int = 4
-    log.info(f"Submiting {tasks} tasks")
-
+    logger.info(f"Submiting {tasks} tasks")
     with ProcessPoolExecutor(max_workers=tasks) as executor:
         futures = [
             executor.submit(
                 generate_users_data,
-                n=1_000_000,
+                n=round(amount / tasks),
                 fake=fake,
                 query=query,
             )
@@ -101,12 +88,14 @@ def main() -> ...:
     for future in as_completed(futures):
         output = future.result()
         if output:
-            log.warning(f"Got output from process: {output}")
+            logger.warning(f"Got output from process: {output}")
+
+    logger.info("All tasks finished successfully")
 
 
 if __name__ == "__main__":
     try:
-        main()
+        Fire(main)
     except Exception as err:
-        log.exception(err)
+        logger.exception(err)
         sys.exit(1)
