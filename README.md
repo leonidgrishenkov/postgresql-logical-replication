@@ -213,15 +213,16 @@ docker logs --tail 20 postgres
 
 ```sh
 poetry env use (which python3)
-```
-
-```sh
 poetry install
 ```
+
+Activate python environment:
 
 ```sh
 poetry shell
 ```
+
+Set env variable with master host external IP:
 
 ```sh
 export POSTGRES_HOST=$VM_MASTER_EXT_IP
@@ -306,16 +307,10 @@ On the target host:
 
 ```sql
 SELECT * FROM pg_stat_subscription;
-```
 
-```sql
 SELECT * FROM pg_subscription;
-```
 
-```sql
 SELECT * FROM pg_publication;
-```
 
-```sql
 SELECT * FROM pg_replication_slots;
 ```
