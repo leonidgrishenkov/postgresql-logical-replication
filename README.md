@@ -145,7 +145,7 @@ export VM_MASTER_EXT_IP=$(terraform output -json | jq -r '.["vm-master-external-
 Get serial port output of deployed virtual machines to make sure that everything is correct:
 
 ```sh
-yc compute instance get-serial-port-output --name postgresql-source
+yc compute instance get-serial-port-output --name postgresql-master
 ```
 
 # Set logical replication on the master database
@@ -179,7 +179,7 @@ hostssl all all 10.0.0.32/32 md5
 hostssl all replication 10.0.0.32 md5
 ```
 
-Where `10.0.0.32` - internal IP of the target host with a subnet mask, that we can get from `terraform output` command.
+Where `10.0.0.32` - internal IP of the replica host with a subnet mask, that we can get from `terraform output` command.
 
 ## WAL log level
 
@@ -291,7 +291,7 @@ PUBLICATION migration;
 
 Where:
 
--   `host=10.0.0.8` - internal IP of the source host, that we can get from `terraform output` command as well.
+-   `host=10.0.0.8` - internal IP of the master host, that we can get from `terraform output` command as well.
 -   `port=15432` - exposed docker port
 
 # Replication status
