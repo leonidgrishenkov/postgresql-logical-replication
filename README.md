@@ -20,8 +20,6 @@ Create a self-signed root certificate:
 openssl req -x509 -new -nodes -key ./certs/ca.key -sha256 -days 365 -out ./certs/ca.crt
 ```
 
-You will be prompted to enter information. You can skip most of the promts, but make sure to set the `Common Name (CN)` to the server's hostname or IP address.
-
 ## Generate Server Certificates
 
 Generate a private key for the server:
@@ -35,8 +33,6 @@ Create a certificate signing request (CSR) for the server:
 ```bash
 openssl req -new -key ./certs/server.key -out ./certs/server.csr
 ```
-
-Again, you will be prompted to enter information, make sure you fill the `Common Name (CN)` section.
 
 Sign the server certificate with the CA:
 
@@ -63,8 +59,6 @@ Sign the client certificate with the CA:
 ```bash
 openssl x509 -req -in ./certs/client.csr -CA ./certs/ca.crt -CAkey ./certs/ca.key -CAcreateserial -out ./certs/client.crt -days 365 -sha256
 ```
-
-Again make sure you fill the `Common Name (CN)` section.
 
 # Build image
 
@@ -144,8 +138,8 @@ terraform output
 Set those output values as env variables:
 
 ```sh
-export VM_SOURCE_EXT_IP=$(terraform output -json | jq -r '.["vm-source-external-ip"].value') \
-    && export VM_TARGET_EXT_IP=$(terraform output -json | jq -r '.["vm-target-external-ip"].value')
+export VM_MASTER_EXT_IP=$(terraform output -json | jq -r '.["vm-master-external-ip"].value') \
+    && export VM_REPLICA_1_EXT_IP=$(terraform output -json | jq -r '.["vm-replica-1-external-ip"].value')
 ```
 
 Get serial port output of deployed virtual machines to make sure that everything is correct:
@@ -154,12 +148,12 @@ Get serial port output of deployed virtual machines to make sure that everything
 yc compute instance get-serial-port-output --name postgresql-source
 ```
 
-# Set logical replication on the source database
+# Set logical replication on the master database
 
 Login on the host:
 
 ```sh
-ssh -i ~/.ssh/dev-hosts yc-user@$VM_SOURCE_EXT_IP
+ssh -i ~/.ssh/dev-hosts yc-user@$VM_MASTER_EXT_IP
 ```
 
 Attach to the container:
@@ -181,11 +175,11 @@ vim /var/lib/postgresql/data/pg_hba.conf
 Add the followings configurations:
 
 ```sh
-hostssl all all target-host-internal-ip/32 md5
-hostssl all replication target-host-internal-ip/32 md5
+hostssl all all 10.0.0.32/32 md5
+hostssl all replication 10.0.0.32 md5
 ```
 
-You can get internal ip of target host from `terraform output` command.
+Where `10.0.0.32` - internal IP of the target host with a subnet mask, that we can get from `terraform output` command.
 
 ## WAL log level
 
@@ -230,7 +224,7 @@ poetry shell
 ```
 
 ```sh
-export POSTGRES_HOST=$VM_SOURCE_EXT_IP
+export POSTGRES_HOST=$VM_MASTER_EXT_IP
 ```
 
 Execute table DDL:
@@ -239,22 +233,89 @@ Execute table DDL:
 python src/execute_ddl.py
 ```
 
-Generate and insert generated data into source database:
+Generate and insert generated data into master database:
 
 ```sh
 python src/generate_users_data.py --tasks=4 --amount=100000
 ```
 
+# Create schema in the replica
+
+Login on the replica host.
+
 ```sh
-sudo docker run --detach --quiet \
-    --name postgres \
-    --publish 15432:5432 \
-    --env POSTGRES_DB=db \
-    --env POSTGRES_USER=postgres \
-    --env POSTGRES_PASSWORD=qwepoiFGH1209 \
-    cr.yandex/crpp4jlcdhtssqb27og2/postgres-ssl:16.4-bullseye-1.6 \
-    -c ssl=on \
-    -c ssl_cert_file=/var/lib/postgresql/certs/server.crt \
-    -c ssl_key_file=/var/lib/postgresql/certs/server.key \
-    -c ssl_ca_file=/var/lib/postgresql/certs/ca.crt
+ssh -i ~/.ssh/dev-hosts yc-user@$VM_REPLICA_1_EXT_IP
+```
+
+Execute `pg_dump` command to dump schema of source database.
+
+```sh
+pg_dump -h 10.0.0.8 \
+    -U postgres \
+    -p 15432 \
+    --schema-only \
+    --no-privileges \
+    --no-subscriptions \
+    -d db -Fd -f /tmp/db_dump
+```
+
+You will be prompt to enter a password.
+
+Restore this schema:
+
+```sh
+pg_restore -Fd -v \
+    --single-transaction \
+    -s --no-privileges \
+    -h localhost \
+    -U postgres \
+    -p 5432 \
+    -d db /tmp/db_dump
+```
+
+# Create publication and subscription
+
+In the master database create publication:
+
+```sql
+CREATE PUBLICATION migration FOR ALL TABLES;
+```
+
+In the replica create subscription:
+
+```sql
+CREATE SUBSCRIPTION migration
+CONNECTION 'host=10.0.0.8 port=15432 user=postgres password= sslmode=require dbname=db'
+PUBLICATION migration;
+```
+
+Where:
+
+-   `host=10.0.0.8` - internal IP of the source host, that we can get from `terraform output` command as well.
+-   `port=15432` - exposed docker port
+
+# Replication status
+
+Replication statistics on the source host:
+
+```sql
+SELECT * FROM pg_stat_replication;
+```
+
+On the target host:
+
+```sql
+SELECT * FROM pg_stat_subscription;
+```
+
+```sql
+SELECT * FROM pg_subscription;
+```
+
+```sql
+SELECT * FROM pg_publication;
+```
+
+```sql
+SELECT * FROM pg_replication_slots;
 ```

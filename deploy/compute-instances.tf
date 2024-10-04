@@ -3,9 +3,9 @@ locals {
   ssh_key_path = "~/.ssh/dev-hosts.pub"
 }
 
-resource "yandex_compute_instance" "vm-source" {
-  name        = "postgresql-source"
-  hostname    = "postgresql-source"
+resource "yandex_compute_instance" "vm-master" {
+  name        = "postgresql-master"
+  hostname    = "postgresql-master"
   platform_id = "standard-v3"
   zone        = var.zone
   folder_id   = var.folder_id
@@ -47,13 +47,13 @@ resource "yandex_compute_instance" "vm-source" {
   }
 }
 
-data "yandex_compute_instance" "vm-source" {
-  instance_id = yandex_compute_instance.vm-source.id
+data "yandex_compute_instance" "vm-master" {
+  instance_id = yandex_compute_instance.vm-master.id
 }
 
-resource "yandex_compute_instance" "vm-target" {
-  name        = "postgresql-target"
-  hostname    = "postgresql-target"
+resource "yandex_compute_instance" "vm-replica-1" {
+  name        = "postgresql-replica-1"
+  hostname    = "postgresql-replica-1"
   platform_id = "standard-v3"
   zone        = var.zone
   folder_id   = var.folder_id
@@ -96,6 +96,6 @@ resource "yandex_compute_instance" "vm-target" {
 }
 
 
-data "yandex_compute_instance" "vm-target" {
-  instance_id = yandex_compute_instance.vm-target.id
+data "yandex_compute_instance" "vm-replica-1" {
+  instance_id = yandex_compute_instance.vm-replica-1.id
 }
