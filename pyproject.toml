@@ -12,6 +12,7 @@ faker = "^30.1.0"
 sqlalchemy = "^2.0.35"
 psycopg2-binary = "^2.9.9"
 fire = "^0.7.0"
+pyarrow = "^17.0.0"
 
 
 [build-system]

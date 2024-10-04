@@ -98,7 +98,7 @@ Build and push an image to the registry:
 docker build -t $POSTGRES_IMAGE \
 	--load \
 	--platform linux/amd64,linux/arm64 \
-	-f ./Dockerfile .
+	-f ./docker/postgresql/Dockerfile
 ```
 
 ```sh
@@ -215,48 +215,18 @@ Check the container logs:
 docker logs --tail 20 postgres
 ```
 
-# Add data to the source database
-
-Export repositoty to the host:
-
-```sh
-task sync-source
-```
-
-Login to the host:
-
-```sh
-ssh -i ~/.ssh/dev-hosts yc-user@$VM_SOURCE_EXT_IP
-```
-
-Copy sql files into the container:
-
-```sh
-docker cp ~/code/postgresql-logical-replication/data/ postgres:/tmp/
-```
-
-Start psql session in the container:
-
-```sh
-docker exec -it postgres psql "dbname=db user=postgres"
-```
-
-Execute DDL query to create schema:
-
-```sh
-\i /tmp/data/ddl/users.sql
-```
-
-And insert data:
-
-```sh
-\i /tmp/data/insert/users.sql
-```
-
 # Generate data
 
 ```sh
+poetry env use (which python3)
+```
+
+```sh
 poetry install
+```
+
+```sh
+poetry shell
 ```
 
 ```sh
@@ -272,5 +242,19 @@ python src/execute_ddl.py
 Generate and insert generated data into source database:
 
 ```sh
-python src/generate_users_data.py --tasks=2 --amount=10000
+python src/generate_users_data.py --tasks=4 --amount=100000
+```
+
+```sh
+sudo docker run --detach --quiet \
+    --name postgres \
+    --publish 15432:5432 \
+    --env POSTGRES_DB=db \
+    --env POSTGRES_USER=postgres \
+    --env POSTGRES_PASSWORD=qwepoiFGH1209 \
+    cr.yandex/crpp4jlcdhtssqb27og2/postgres-ssl:16.4-bullseye-1.6 \
+    -c ssl=on \
+    -c ssl_cert_file=/var/lib/postgresql/certs/server.crt \
+    -c ssl_key_file=/var/lib/postgresql/certs/server.key \
+    -c ssl_ca_file=/var/lib/postgresql/certs/ca.crt
 ```

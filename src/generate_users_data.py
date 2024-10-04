@@ -1,12 +1,15 @@
+import os
+import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from uuid import uuid4
 
+import pandas as pd
 from faker import Faker
 from fire import Fire
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine.base import Connection
+from sqlalchemy import create_engine
 
 from utils import DB_URL, logger
 
@@ -40,39 +43,30 @@ def _generate_user(fake: Faker) -> User:
 
 def generate_users_data(
     n: int,
-    fake: Faker,
-    query: str,
+    cache_dir: Path,
 ) -> ...:
     logger.info(f"Generating {n} number of users")
+    fake = Faker(locale="en_US")
 
-    engine = create_engine(
-        url=DB_URL,
-        connect_args={
-            "sslmode": "require",
-            "sslrootcert": Path(__file__).parents[1] / "certs/ca.crt",
-            "sslcert": Path(__file__).parents[1] / "certs/client.crt",
-            "sslkey": Path(__file__).parents[1] / "certs/client.key",
-        },
-    )
-    conn: Connection = engine.connect()
-
+    users = []
     for _ in range(n):
-        _user: User = _generate_user(fake=fake)
-        conn.execute(text(query), asdict(_user))
-        conn.commit()
+        users.append(_generate_user(fake=fake))
 
-    conn.close()
-    logger.info(f"Successfully inserted {n} usert into database table")
+    table = pd.DataFrame([asdict(user) for user in users])
+
+    _output_path: Path = cache_dir / f"{uuid4()}.parquet"
+
+    table.to_parquet(_output_path, engine="pyarrow")
+    logger.info(f"Successfully generated {n} users. Stored as: {_output_path}")
 
 
 def main(tasks: int, amount: int) -> ...:
-    fake = Faker(locale="en_US")
-
     logger.info(f"Will generate {amount} of users")
 
-    sqlfile: Path = Path(__file__).parents[0] / "sql/insert/users.sql"
-    logger.info(f"Reading sql file: {sqlfile}")
-    query: str = sqlfile.read_text()
+    _cache_dir: Path = Path(__file__).parents[1] / ".cache"
+    if _cache_dir.exists():
+        shutil.rmtree(_cache_dir)
+    _cache_dir.mkdir()
 
     logger.info(f"Submiting {tasks} tasks")
     with ProcessPoolExecutor(max_workers=tasks) as executor:
@@ -80,8 +74,7 @@ def main(tasks: int, amount: int) -> ...:
             executor.submit(
                 generate_users_data,
                 n=round(amount / tasks),
-                fake=fake,
-                query=query,
+                cache_dir=_cache_dir,
             )
             for _ in range(tasks)
         ]
@@ -89,8 +82,40 @@ def main(tasks: int, amount: int) -> ...:
         output = future.result()
         if output:
             logger.warning(f"Got output from process: {output}")
-
     logger.info("All tasks finished successfully")
+
+    logger.info(f"Creating table based on files in {_cache_dir}")
+    table: pd.DataFrame = pd.concat(
+        [pd.read_parquet(_cache_dir / file) for file in os.listdir(_cache_dir)]
+    )
+    logger.debug("Table shape is %s", table.shape)
+
+    _certs_dir = Path(__file__).parents[1] / "certs"
+    logger.info(f"Initializing database engine. Using SSL certs from {_certs_dir}")
+
+    engine = create_engine(
+        url=DB_URL,
+        connect_args={
+            "sslmode": "require",
+            "sslrootcert": _certs_dir / "ca.crt",
+            "sslcert": _certs_dir / "client.crt",
+            "sslkey": _certs_dir / "client.key",
+        },
+    )
+
+    _dbtable = "public.users"
+    logger.info(f"Inserting data into {_dbtable} database table")
+
+    with engine.connect() as conn:
+        table.to_sql(
+            schema=_dbtable.split(".")[0],
+            name=_dbtable.split(".")[1],
+            index=False,
+            con=conn,
+            if_exists="append",
+        )
+    logger.info("Inserted all data successfully")
+    shutil.rmtree(_cache_dir)
 
 
 if __name__ == "__main__":

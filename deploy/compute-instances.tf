@@ -38,9 +38,11 @@ resource "yandex_compute_instance" "vm-source" {
         ssh_key_path      = file("${local.ssh_key_path}"),
         username          = local.username,
         iam_token         = var.iam_token
+        postgres_image    = var.postgres_image,
         postgres_user     = var.postgres_user,
         postgres_password = var.postgres_password,
-        postgres_image    = var.postgres_image,
+        postgres_db       = var.postgres_db,
+        postgres_port     = var.postgres_port,
     })
   }
 }
@@ -84,9 +86,11 @@ resource "yandex_compute_instance" "vm-target" {
         ssh_key_path      = file("${local.ssh_key_path}"),
         username          = local.username,
         iam_token         = var.iam_token
+        postgres_image    = var.postgres_image,
         postgres_user     = var.postgres_user,
         postgres_password = var.postgres_password,
-        postgres_image    = var.postgres_image,
+        postgres_db       = var.postgres_db,
+        postgres_port     = var.postgres_port,
     })
   }
 }
