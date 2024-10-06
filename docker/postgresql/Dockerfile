@@ -1,4 +1,4 @@
-FROM postgres:16.4-bullseye
+FROM docker.io/postgres:16.4-bullseye
 
 # Copy SSL certificates
 COPY ./certs/server.crt /var/lib/postgresql/certs/server.crt
