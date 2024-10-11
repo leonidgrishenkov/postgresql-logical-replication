@@ -1,6 +1,9 @@
 .env
 env.sh
-certs/*
+**/*.crt
+**/*.csr
+**/*.key
+**/*.srl
 
 # Local .terraform directories
 **/.terraform/*

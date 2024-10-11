@@ -2,10 +2,6 @@
 
 Using OpenSSL.
 
-```sh
-mkdir certs
-```
-
 ## Create a Certificate Authority (CA)
 
 Generate a private key for the CA:
